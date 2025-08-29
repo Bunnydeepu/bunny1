@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Campus Circle – MVP</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root{--accent:#2563eb;--bg:#f7f7fb;--card:#ffffff;--text:#111827;--muted:#6b7280;}
+    *{box-sizing:border-box} body{margin:0;font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Arial;background:var(--bg);color:var(--text);} 
+    .container{max-width:980px;margin:0 auto;padding:16px}
+    .nav{display:flex;align-items:center;justify-content:space-between;margin:12px 0}
+    .brand{font-weight:700;font-size:20px}
+    .btn{appearance:none;border:0;background:var(--accent);color:#fff;padding:10px 14px;border-radius:10px;font-weight:600;cursor:pointer}
+    .btn.outline{background:#fff;border:1px solid #dadde3;color:var(--text)}
+    .card{background:var(--card);border:1px solid #e5e7eb;border-radius:16px;box-shadow:0 2px 10px rgba(0,0,0,.04);padding:16px}
+    .stack{display:flex;gap:12px;align-items:center}
+    .col{display:flex;flex-direction:column;gap:12px}
+    .input{width:100%;padding:12px 14px;border:1px solid #e5e7eb;border-radius:12px;outline:none}
+    .muted{color:var(--muted)}
+    .hidden{display:none}
+    .feed{display:flex;flex-direction:column;gap:16px;margin-top:12px}
+    .post img,.post video{width:100%;border-radius:12px;border:1px solid #e5e7eb}
+    .pill{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:999px;background:#eef2ff;color:#1e40af;font-weight:600;font-size:12px}
+    .avatar{width:36px;height:36px;border-radius:50%;object-fit:cover;border:1px solid #e5e7eb}
+    .actions{display:flex;gap:10px}
+    .iconbtn{background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:8px 10px;cursor:pointer}
+    .pin-badge{background:#fff0c2;border:1px solid #facc15;color:#854d0e;padding:2px 8px;border-radius:999px;font-size:12px}
+    .divider{height:1px;background:#eee;margin:12px 0}
+    .footer{margin:36px 0;text-align:center;color:#9ca3af;font-size:12px}
+    @media (max-width:720px){.container{padding:12px}}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="nav">
+      <div class="brand">🏫 Campus Circle</div>
+      <div class="stack">
+        <span id="userInfo" class="muted"></span>
+        <button id="signOutBtn" class="btn outline hidden">Sign out</button>
+      </div>
+    </div>
+
+    <!-- AUTH CARD -->
+    <section id="authSection" class="card" style="max-width:520px;margin:24px auto;">
+      <h2 style="margin:0 0 8px 0;">Login / Sign up</h2>
+      <p class="muted" style="margin:0 0 12px 0;">Exclusive to college students & staff</p>
+      <div class="col">
+        <input id="email" class="input" placeholder="College email (e.g. you@college.edu)">
+        <input id="password" type="password" class="input" placeholder="Password (min 6 chars)">
+        <div class="stack">
+          <button id="loginBtn" class="btn">Log in</button>
+          <button id="signupBtn" class="btn outline">Sign up</button>
+        </div>
+        <small class="muted">Only emails ending with <code id="domainLabel"></code> can create an account.</small>
+      </div>
+    </section>
+
+    <!-- APP -->
+    <section id="appSection" class="hidden">
+      <!-- Pinned banner -->
+      <div id="pinnedBanner" class="card hidden" style="margin:16px 0;">
+        <span class="pill">📌 Pinned</span>
+        <div id="pinnedList" class="col" style="margin-top:8px"></div>
+      </div>
+
+      <!-- Create post -->
+      <div class="card" style="margin:16px 0;">
+        <div class="stack">
+          <img id="meAvatar" class="avatar" src="" alt="me"/>
+          <input id="postText" class="input" placeholder="Share something with campus..."/>
+        </div>
+        <div class="stack" style="margin-top:10px;justify-content:space-between;">
+          <input id="mediaFile" type="file" accept="image/*,video/*">
+          <div class="stack">
+            <label class="stack muted" style="gap:6px;"><input id="pinToggle" type="checkbox"> <span>Pin (staff only)</span></label>
+            <button id="postBtn" class="btn">Post</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Feed -->
+      <div id="feed" class="feed"></div>
+    </section>
+
+    <div class="footer">Starter MVP • HTML + Firebase • Build fast, iterate faster</div>
+  </div>
+
+  <!-- Firebase SDKs (v10 modular) -->
+  <script type="module">
+    // ======== 1) EDIT THESE TO YOUR PROJECT ========
+    const ALLOWED_DOMAIN = "@college-be699.ac.in"; // <-- change to your real college domain
+    const STAFF_EMAILS = [
+      // Optional: add staff/faculty emails here to enable the pin toggle for them by default
+      // "hod@college.edu", "dean@college-be699.ac.in"
+    ];
+
+    // Replace with your Firebase config from Console -> Project settings -> General
+    const firebaseConfig = {
+  apiKey: "AIzaSyB60vfTxQ6-4AxwaEWcuMG4_PmIb-ZEJso",
+  authDomain: "college-be699.firebaseapp.com",
+  projectId: "college-be699",
+  storageBucket: "college-be699.appspot.com",
+  messagingSenderId: "415655827111",
+  appId: "1:415655827111:web:a7accddfc5c0d9dd6a2d82",
+  measurementId: "G-STPYDWH973"
+    };
+    // ===============================================
+
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-app.js";
+    import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, updateProfile, signOut } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-auth.js";
+    import { getFirestore, collection, doc, setDoc, getDoc, addDoc, getDocs, query, where, orderBy, limit, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore.js";
+    import { getStorage, ref as sRef, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-storage.js";
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+    const storage = getStorage(app);
+
+    // UI Refs
+    const domainLabel = document.getElementById('domainLabel');
+    domainLabel.textContent = ALLOWED_DOMAIN;
+
+    const authSection = document.getElementById('authSection');
+    const appSection = document.getElementById('appSection');
+
+    const emailEl = document.getElementById('email');
+    const passwordEl = document.getElementById('password');
+    const loginBtn = document.getElementById('loginBtn');
+    const signupBtn = document.getElementById('signupBtn');
+    const signOutBtn = document.getElementById('signOutBtn');
+
+    const meAvatar = document.getElementById('meAvatar');
+    const userInfo = document.getElementById('userInfo');
+
+    const postText = document.getElementById('postText');
+    const mediaFile = document.getElementById('mediaFile');
+    const postBtn = document.getElementById('postBtn');
+    const pinToggle = document.getElementById('pinToggle');
+
+    const feed = document.getElementById('feed');
+    const pinnedBanner = document.getElementById('pinnedBanner');
+    const pinnedList = document.getElementById('pinnedList');
+
+    // Helpers
+    const sleep = (ms)=> new Promise(r=>setTimeout(r,ms));
+    const el = (html)=>{const d=document.createElement('div'); d.innerHTML=html.trim(); return d.firstChild};
+
+    function isCollegeEmail(email){
+      return email && email.toLowerCase().endsWith(ALLOWED_DOMAIN.toLowerCase());
+    }
+
+    async function ensureUserDoc(user){
+      const uRef = doc(db, 'users', user.uid);
+      const snap = await getDoc(uRef);
+      if (!snap.exists()){
+        const role = STAFF_EMAILS.includes(user.email) ? 'staff' : 'student';
+        await setDoc(uRef, { uid:user.uid, name:user.displayName||user.email.split('@')[0], email:user.email, photoURL:user.photoURL||'', role, createdAt: serverTimestamp()});
+      }
+    }
+
+    async function getMyRole(){
+      if (!auth.currentUser) return 'guest';
+      const snap = await getDoc(doc(db,'users',auth.currentUser.uid));
+      return snap.exists()? (snap.data().role||'student') : 'student';
+    }
+
+    // Auth flows
+    signupBtn.onclick = async ()=>{
+      const email = emailEl.value.trim();
+      const pass = passwordEl.value;
+      if (!isCollegeEmail(email)) return alert(`Use your college email ending with ${ALLOWED_DOMAIN}`);
+      if (pass.length < 6) return alert('Password must be at least 6 characters');
+      try{
+        const cred = await createUserWithEmailAndPassword(auth, email, pass);
+        await ensureUserDoc(cred.user);
+      }catch(e){ alert(e.message); }
+    };
+
+    loginBtn.onclick = async ()=>{
+      const email = emailEl.value.trim();
+      const pass = passwordEl.value;
+      if (!isCollegeEmail(email)) return alert(`Use your college email ending with ${ALLOWED_DOMAIN}`);
+      try{
+        await signInWithEmailAndPassword(auth, email, pass);
+      }catch(e){ alert(e.message); }
+    };
+
+    signOutBtn.onclick = ()=> signOut(auth);
+
+    onAuthStateChanged(auth, async (user)=>{
+      if (user){
+        await ensureUserDoc(user);
+        authSection.classList.add('hidden');
+        appSection.classList.remove('hidden');
+        signOutBtn.classList.remove('hidden');
+        userInfo.textContent = user.email;
+        meAvatar.src = user.photoURL || 'https://api.dicebear.com/8.x/initials/svg?seed=' + encodeURIComponent(user.email);
+
+        const role = await getMyRole();
+        pinToggle.disabled = role !== 'staff';
+        if (pinToggle.disabled){ pinToggle.parentElement.classList.add('muted'); }
+
+        await loadPinned();
+        await loadFeed();
+      } else {
+        authSection.classList.remove('hidden');
+        appSection.classList.add('hidden');
+        signOutBtn.classList.add('hidden');
+        userInfo.textContent = '';
+        feed.innerHTML = '';
+      }
+    });
+
+    // Create post
+    postBtn.onclick = async ()=>{
+      const user = auth.currentUser; if (!user) return alert('Login first.');
+      const text = postText.value.trim();
+      const file = mediaFile.files[0];
+      let mediaURL = '', mediaType = '';
+      try{
+        if (file){
+          const ext = file.name.split('.').pop();
+          const path = `posts/${user.uid}/${Date.now()}.${ext}`;
+          const r = sRef(storage, path);
+          await uploadBytes(r, file);
+          mediaURL = await getDownloadURL(r);
+          mediaType = file.type.startsWith('video')? 'video' : 'image';
+        }
+        const role = await getMyRole();
+        const isPinned = pinToggle.checked && role === 'staff';
+        await addDoc(collection(db,'posts'),{
+          uid:user.uid, author:user.email, text, mediaURL, mediaType,
+          createdAt: serverTimestamp(), isPinned, likeCount:0, commentCount:0
+        });
+        postText.value=''; mediaFile.value=''; pinToggle.checked=false;
+        await loadPinned();
+        await loadFeed();
+      }catch(e){ alert(e.message); }
+    };
+
+    // Load pinned (query only pinned)
+    async function loadPinned(){
+      pinnedList.innerHTML='';
+      const q = query(collection(db,'posts'), where('isPinned','==',true), orderBy('createdAt','desc'), limit(5));
+      const snap = await getDocs(q);
+      if (snap.empty){ pinnedBanner.classList.add('hidden'); return; }
+      pinnedBanner.classList.remove('hidden');
+      snap.forEach(docu=>{
+        const p = docu.data();
+        const item = el(`<div class="stack"><span class="pin-badge">Pinned</span><span>${escapeHtml(p.text||'Pinned post')}</span></div>`);
+        pinnedList.appendChild(item);
+      });
+    }
+
+    // Load feed (2 queries: pinned + regular)
+    async function loadFeed(){
+      feed.innerHTML='';
+      // Pinned first
+      const qp = query(collection(db,'posts'), where('isPinned','==',true), orderBy('createdAt','desc'), limit(20));
+      const qn = query(collection(db,'posts'), where('isPinned','==',false), orderBy('createdAt','desc'), limit(50));
+      const [sp, sn] = await Promise.all([getDocs(qp), getDocs(qn)]);
+      [...sp.docs, ...sn.docs].forEach(d=> feed.appendChild(renderPost(d.id, d.data())));
+    }
+
+    // Render a post card
+    function renderPost(id, p){
+      const media = p.mediaURL? (p.mediaType==='video'? `<video src="${p.mediaURL}" controls></video>` : `<img src="${p.mediaURL}" alt="post">`) : '';
+      const node = el(`
+        <article class="card post">
+          <div class="stack" style="justify-content:space-between;">
+            <div class="stack">
+              <img class="avatar" src="https://api.dicebear.com/8.x/initials/svg?seed=${encodeURIComponent(p.author||'U')}">
+              <div class="col" style="gap:2px">
+                <strong>${escapeHtml(p.author||'Unknown')}</strong>
+                ${p.isPinned? '<span class="pin-badge">📌 Pinned</span>':''}
+              </div>
+            </div>
+          </div>
+          <div style="margin:8px 0 10px 0;">${escapeHtml(p.text||'')}</div>
+          ${media}
+          <div class="divider"></div>
+          <div class="actions">
+            <button class="iconbtn" onclick="alert('Like logic – add to posts/'+ '${id}' + '/likes')">♡ Like</button>
+            <button class="iconbtn" onclick="alert('Comment logic – add to posts/'+ '${id}' + '/comments')">💬 Comment</button>
+          </div>
+        </article>
+      `);
+      return node;
+    }
+
+    // Tiny sanitizer
+    function escapeHtml(str){
+      return (str||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+    postBtn.onclick = async () => {
+  const user = auth.currentUser; 
+  if (!user) return alert('Login first.');
+
+  const text = postText.value.trim();
+  const file = mediaFile.files[0];
+  let mediaData = '', mediaType = '';
+
+  try {
+    console.log("🚀 Creating post for:", user.email, "Text:", text);
+
+    // Convert image/video to Base64
+    if (file) {
+      mediaType = file.type.startsWith('video') ? 'video' : 'image';
+      mediaData = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+      console.log("✅ File converted to Base64, length:", mediaData.length);
+    }
+
+    const role = await getMyRole();
+    const isPinned = pinToggle.checked && role === 'staff';
+
+    const docRef = await addDoc(collection(db, 'posts'), {
+      uid: user.uid,
+      author: user.email,
+      text,
+      mediaURL: mediaData,
+      mediaType,
+      createdAt: serverTimestamp(),
+      isPinned,
+      likeCount: 0,
+      commentCount: 0
+    });
+    console.log("✅ Post created with ID:", docRef.id);
+
+    postText.value = '';
+    mediaFile.value = '';
+    pinToggle.checked = false;
+
+    await loadPinned();
+    await loadFeed();
+    console.log("📃 Feed reloaded successfully");
+
+  } catch (e) {
+    console.error("❌ Post error:", e);
+    alert("Error posting: " + e.message);
+  }
+};
+
+
+  </script>
+
+  <!-- Suggested Firestore Rules (copy into Firebase Console -> Firestore -> Rules) -->
+  <!--
+  rules_version = '2';
+  service cloud.firestore {
+    match /databases/{database}/documents {
+      function isSignedIn(){ return request.auth != null; }
+      function isStaff(){ return isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'staff'; }
+
+      match /users/{uid} {
+        allow read: if isSignedIn();
+        allow write: if isSignedIn() && uid == request.auth.uid;
+      }
+
+      match /posts/{postId} {
+        allow read: if true; // open read for MVP
+        allow create: if isSignedIn() && request.resource.data.author == request.auth.token.email;
+        allow update: if isStaff(); // only staff can toggle isPinned etc.
+        allow delete: if isStaff();
+      }
+    }
+  }
+  -->
+
+  <!-- Suggested Storage Rules (Console -> Storage -> Rules) -->
+  <!--
+  rules_version = '2';
+  service firebase.storage {
+    match /b/{bucket}/o {
+      match /posts/{uid}/{allPaths=**} {
+        allow read; // public read for MVP
+        allow write: if request.auth != null && request.auth.uid == uid;
+      }
+    }
+  }
+  -->
+</body>
+</html>
